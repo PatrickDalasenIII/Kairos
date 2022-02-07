@@ -17,6 +17,7 @@ from nltk import pos_tag
 from nltk.corpus import stopwords
 nltk.download('wordnet')
 nltk.download('omw-1.4')
+nltk.download('punkt')
 pos_dict = {'J':wordnet.ADJ, 'V':wordnet.VERB, 'N':wordnet.NOUN, 'R':wordnet.ADV}
 
 def token_stop_pos(text):
