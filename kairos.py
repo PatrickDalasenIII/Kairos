@@ -197,7 +197,15 @@ with teacher:
 	teacher_dropdown = st.selectbox('Teachers', data2['Teacher'].unique())
 	bar_graph_teacher(data2, teacher_dropdown)
 
+def course_options():
+    courses_opt  = []
+    for comment in data2.itertuples():
+        if comment.Teacher in teacher_dropdown:
+            courses_opt.append(comment.Course)
+    data3 = pd.DataFrame(courses_opt, columns=['Course'])
+    return data3['Course'].unique()
+
 with course:
-	courses_dropdown = st.selectbox('Courses', data2['Course'].unique())
+	courses_dropdown = st.selectbox('Courses', course_options())
 	bar_graph_course(data2, courses_dropdown)
 	#&& data2['Teacher'] == 'teacher_dropdown'
