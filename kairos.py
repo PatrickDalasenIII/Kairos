@@ -157,7 +157,7 @@ with classify:
 		data['Text_Blob Polarity'] = data['Lemma'].apply(getPolarity) 
 		data['Classification'] = data['Text_Blob Polarity'].apply(analysis)
 		data2 = load_data()
-		data2 = data2.sort_values('Classification')
+		data2 = data2.sort_values('Classification', ascending=False)
 		st.dataframe(data2[['Text','Classification']])
 		
 		#Insert Topics
