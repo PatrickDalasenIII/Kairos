@@ -1,9 +1,10 @@
 import graphlib
 import streamlit as st
 import pandas as pd
+import numpy as np
 from PIL import Image
-image = Image.open('SLU_logo.jpg')
-image2 = Image.open('SAMCISv2_logo.jpg')
+slu_logo = Image.open('SLU_logo.png')
+samcis_logo = Image.open('SAMCISv2_logo.png')
 
 #Gensim modules
 import os.path
@@ -14,9 +15,9 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 
 #Initialize df container
-global data2
-global data5
-data2 = pd.DataFrame(columns=['Course','Teacher','Text', 'Classification'])
+global main_data
+global data_classifications
+main_data = pd.DataFrame(columns=['Course','Teacher','Text', 'Classification'])
 
 if "load_state" not in st.session_state:
 	st.session_state.load_state = False
@@ -74,23 +75,6 @@ def analysis(score):
 	else:
 		return 'Positive'
 
-#Plot
-def bar_graph_course(df, value, value2, is_restricted):
-	if is_restricted:
-		df_course = df[(df['Course'] ==  value) & (df['Teacher'] == value2)]['Classification'].value_counts()
-	else:
-		df_course = df[df['Course'] ==  value]['Classification'].value_counts()
-
-	st.bar_chart(df_course)
-
-def bar_graph_teacher(df, value, value2, is_restricted):
-	if is_restricted:
-		df_teacher = df[(df['Teacher'] == value) & (df['Course'] == value2)]['Classification'].value_counts()
-	else:
-		df_teacher = df[df['Teacher'] == value]['Classification'].value_counts()
-
-	st.bar_chart(df_teacher)
-
 #LSA functions
 #prepare corpus
 def prepare_corpus(classified_text):
@@ -130,14 +114,94 @@ def preprocess_data(doc_set):
 		texts.append(stemmed_tokens)
 	return texts
 
+
+#Plot
+def bar_graph_course(df, value, value2, is_restricted):
+	if is_restricted:
+		df_course = df[(df['Course'] ==  value) & (df['Teacher'] == value2)]['Classification'].value_counts()
+	else:
+		df_course = df[df['Course'] ==  value]['Classification'].value_counts()
+
+	st.bar_chart(df_course)
+
+def bar_graph_teacher(df, value, value2, is_restricted):
+	if is_restricted:
+		df_teacher = df[(df['Teacher'] == value) & (df['Course'] == value2)]['Classification'].value_counts()
+	else:
+		df_teacher = df[df['Teacher'] == value]['Classification'].value_counts()
+
+	st.bar_chart(df_teacher)
+
+
+def get_teacher_options(list_options):
+	teachers_opt  = []
+	for comment in main_data.itertuples():
+		if comment.Course in list_options:
+			teachers_opt.append(comment.Teacher)
+	data4 = pd.DataFrame(teachers_opt, columns=['Teacher'])
+	return data4['Teacher'].unique()
+
+def get_selected_teacher(is_restricted, cd_options):
+	with st.container():
+		if is_restricted:
+			teacher_dropdown = st.selectbox('Teachers', get_teacher_options(cd_options))
+		else:
+			teacher_dropdown = st.selectbox('Teachers', main_data['Teacher'].unique())
+	return teacher_dropdown
+
+def get_course_options(list_options):
+	courses_opt  = []
+	for comment in main_data.itertuples():
+		if comment.Teacher in list_options:
+			courses_opt.append(comment.Course)
+	data3 = pd.DataFrame(courses_opt, columns=['Course'])
+	return data3['Course'].unique()
+
+def get_selected_course(is_restricted, td_options):
+	with st.container():
+		if is_restricted:
+			courses_dropdown = st.selectbox('Courses', get_course_options(td_options))
+		else:
+			courses_dropdown = st.selectbox('Courses', main_data['Course'].unique())
+	return courses_dropdown
+
+def create_graph(graph_dropdown):
+	if graph_dropdown == 'All Evaluations':
+		teacher = get_selected_teacher(False, [])
+		course = get_selected_course(False, [])
+		st.title(f"Classifications of {teacher}")
+		bar_graph_teacher(main_data, teacher, course, False)
+		st.title(f"Classifications of {course}")
+		bar_graph_course(main_data, course, teacher, False)
+
+	elif graph_dropdown == 'Teachers Evaluation':
+		teacher2 = get_selected_teacher(False, [])
+		course2 = get_selected_course(True, teacher2)
+		st.title(f"Classifications of {teacher2}")
+		bar_graph_teacher(main_data, teacher2, course2, False)
+		st.title(f"Classifications of {course2}")
+		bar_graph_course(main_data, course2, teacher2, True)
+
+	elif graph_dropdown == 'Courses Evaluation':
+		course3 = get_selected_course(False, [])
+		teacher3 = get_selected_teacher(True, course3)
+		st.title(f"Classifications of {course3}")
+		bar_graph_course(main_data, course3, teacher3, False)
+		st.title(f"Classifications of {teacher3}")
+		bar_graph_teacher(main_data, teacher3, course3, True)
+		
+	else:
+		st.error("Something wrong happened")
+
 @st.cache
 def load_data():
 	#Initialize df container
-	data2 = data[['Text', 'Classification','Teacher','Course']]
-	return data2
+	main_data = data[['Text', 'Classification','Teacher','Course']]
+	return main_data
 
 def convert_df(df):
    return df.to_csv().encode('utf-8')
+
 
 header = st.container()
 upload = st.container()
@@ -148,11 +212,11 @@ graph_options = st.container()
 with header: 
 	col1, col2, col3 = st.columns([1,4.8,1])
 	with col1:
-		st.image(image, width=100)
+		st.image(slu_logo, width=100)
 	with col2:
 		st.write('School of Accountancy, Management, Computer and Information Studies')
 	with col3:
-		st.image(image2, width=160)		
+		st.image(samcis_logo, width=160)		
 	st.markdown("<h1 style='text-align: center;'>SET Comment Classifier</h1>", unsafe_allow_html=True)
 	st.markdown("<h5 style='text-align: center;'>Presented to you by Kairos</h5>", unsafe_allow_html=True)
 
@@ -189,7 +253,7 @@ st.markdown(footer,unsafe_allow_html=True)
 with upload:
 	st.title('Upload')
 	
-	uploaded_file = st.file_uploader(" ", type='csv')
+	uploaded_file = st.file_uploader(" ", type='csv', accept_multiple_files=False)
 	if uploaded_file is not None:
 		data = pd.read_csv(uploaded_file)
 		data.columns=['Course','Teacher','Text']
@@ -201,7 +265,18 @@ with upload:
 		else:
 			st.dataframe(data)
 	else:
-		st.text('No file uploaded')
+		st.warning('No file uploaded')
+
+
+def create_graph_options():
+	with graph_options:
+		st.title("Graphs")
+		graph_dropdown = st.selectbox('Select Evaluation', ['All Evaluations', 'Teachers Evaluation', 'Courses Evaluation'])
+		try:
+			create_graph(graph_dropdown)
+		except:
+			st.error("Something went wrong")
+
 
 with classify:
 	st.title('Classify')
@@ -211,21 +286,53 @@ with classify:
 		data['Lemma'] = data['POS tagged'].apply(lemmatize)
 		data['Text_Blob Polarity'] = data['Lemma'].apply(getPolarity) 
 		data['Classification'] = data['Text_Blob Polarity'].apply(analysis)
-		data2 = load_data()
-		data2 = data2.sort_values('Classification', ascending=False)
-		
+		main_data = load_data()
+		main_data = main_data.sort_values('Classification', ascending=False)
+
+		teacher_dropdown_options = np.array(['<ALL TEACHERS>'])
+		teacher_dropdown_options = np.append(teacher_dropdown_options, main_data['Teacher'].unique())
+		course_dropdown_options = np.array(['<ALL COURSES>'])
+		course_dropdown_options = np.append(course_dropdown_options, main_data['Course'].unique())
+
+		teacher_dropdown_df = st.selectbox('Teachers', teacher_dropdown_options, key = 'teacher_df')
+		course_dropdown_df = st.selectbox('Courses', course_dropdown_options, key = 'teacher_df')
+
+
 		sort_value2 = st.selectbox('Filter by',('No Option Selected','Positive','Negative','Neutral'))
 		
-		if sort_value2 == 'Positive': 
-			data5 = data2.loc[data2['Classification']=='Positive'][['Text','Classification']]
-		elif sort_value2 == 'Negative':
-			data5 = data2.loc[data2['Classification']=='Negative'][['Text','Classification']]
-		elif sort_value2 == 'Neutral':
-			data5 = data2.loc[data2['Classification']=='Neutral'][['Text','Classification']]
+		if teacher_dropdown_df == '<ALL TEACHERS>' and course_dropdown_df == '<ALL COURSES>':
+			data_classifications = main_data[['Text','Classification','Teacher', 'Course']]
+		elif teacher_dropdown_df != '<ALL TEACHERS>' and course_dropdown_df == '<ALL COURSES>':
+			if sort_value2 == 'Positive': 
+				data_classifications = main_data.loc[main_data['Classification']=='Positive'][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			elif sort_value2 == 'Negative':
+				data_classifications = main_data.loc[main_data['Classification']=='Negative'][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			elif sort_value2 == 'Neutral':
+				data_classifications = main_data.loc[main_data['Classification']=='Neutral'][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			else:
+				data_classifications = main_data.loc[main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+		elif teacher_dropdown_df == '<ALL TEACHERS>' and course_dropdown_df != '<ALL COURSES>':
+			if sort_value2 == 'Positive': 
+				data_classifications = main_data.loc[main_data['Classification']=='Positive'][main_data['Course']==course_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			elif sort_value2 == 'Negative':
+				data_classifications = main_data.loc[main_data['Classification']=='Negative'][main_data['Course']==course_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			elif sort_value2 == 'Neutral':
+				data_classifications = main_data.loc[main_data['Classification']=='Neutral'][main_data['Course']==course_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			else:
+				data_classifications = main_data.loc[main_data['Course']==course_dropdown_df][['Text','Classification','Teacher', 'Course']]
 		else:
-			data5 = data2[['Text','Classification']]
-		st.dataframe(data5)
-		csv = convert_df(data5)
+			if sort_value2 == 'Positive': 
+				data_classifications = main_data.loc[main_data['Classification']=='Positive'][main_data['Course']==course_dropdown_df][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			elif sort_value2 == 'Negative':
+				data_classifications = main_data.loc[main_data['Classification']=='Negative'][main_data['Course']==course_dropdown_df][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			elif sort_value2 == 'Neutral':
+				data_classifications = main_data.loc[main_data['Classification']=='Neutral'][main_data['Course']==course_dropdown_df][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+			else:
+				data_classifications = main_data.loc[main_data['Course']==course_dropdown_df][main_data['Teacher']==teacher_dropdown_df][['Text','Classification','Teacher', 'Course']]
+		
+
+		st.dataframe(data_classifications)
+		csv = convert_df(data_classifications)
 		st.download_button(
    			"Press to Download",
    			csv,
@@ -233,99 +340,43 @@ with classify:
    			"text/csv",
    			key='download-csv'
 		)
-		#Insert Topics
-		#LSA
-		#grouping positive classifications
-		positive_df = data2.loc[data2['Classification'] == 'Positive']
-		#grouping neutral classifications
-		neutral_df = data2.loc[data2['Classification'] == 'Neutral']
-		#grouping negative classifications
-		negative_df = data2.loc[data2['Classification'] == 'Negative']
-		#creating the LSA models for the different classifications
-		number_of_topics = 3
-		words = 30
-		clean_positive = preprocess_data(positive_df['Text'])
-		clean_neutral = preprocess_data(neutral_df['Text'])
-		clean_negative = preprocess_data(negative_df['Text'])
 
-		#positive LSA
-		st.title('Positive Topics')
-		positive_model=create_gensim_lsa_model(clean_positive,number_of_topics,words)
-		for index, topic in positive_model.show_topics(num_topics=number_of_topics, num_words=words, formatted = False):
-				st.text('Topic: {} \nWords: {}'.format(index+1, '|'.join([w[0] for w in topic])))
-		
-		#negative LSA
-		st.title('Negative Topics')
-		negative_model =create_gensim_lsa_model(clean_negative,number_of_topics,words)
-		for index, topic in negative_model.show_topics(num_topics=number_of_topics, num_words=words, formatted = False):
-				st.text('Topic: {} \nWords: {}'.format(index+1, '|'.join([w[0] for w in topic])))
+		if len(data_classifications) > 0:
+			#Insert Topics
+			#LSA
+			#grouping positive classifications
+			positive_df = data_classifications.loc[data_classifications['Classification'] == 'Positive']
+			#grouping neutral classifications
+			neutral_df = data_classifications.loc[data_classifications['Classification'] == 'Neutral']
+			#grouping negative classifications
+			negative_df = data_classifications.loc[data_classifications['Classification'] == 'Negative']
+			#creating the LSA models for the different classifications
+			number_of_topics = 3
+			words = 30
+			clean_positive = preprocess_data(positive_df['Text'])
+			clean_neutral = preprocess_data(neutral_df['Text'])
+			clean_negative = preprocess_data(negative_df['Text'])
 
-		#neutral LSA
-		st.title('Neutral Topics')
-		neutral_model=create_gensim_lsa_model(clean_neutral,number_of_topics,words)
-		for index, topic in neutral_model.show_topics(num_topics=number_of_topics, num_words=words, formatted = False):
-				st.text('Topic: {} \nWords: {}'.format(index+1, '|'.join([w[0] for w in topic])))
+			#positive LSA
+			st.title('Positive Topics')
+			positive_model=create_gensim_lsa_model(clean_positive,number_of_topics,words)
+			for index, topic in positive_model.show_topics(num_topics=number_of_topics, num_words=words, formatted = False):
+					st.text('Topic: {} \nWords: {}'.format(index+1, '|'.join([w[0] for w in topic])))
+			
+			#negative LSA
+			st.title('Negative Topics')
+			negative_model =create_gensim_lsa_model(clean_negative,number_of_topics,words)
+			for index, topic in negative_model.show_topics(num_topics=number_of_topics, num_words=words, formatted = False):
+					st.text('Topic: {} \nWords: {}'.format(index+1, '|'.join([w[0] for w in topic])))
 
-def get_teacher_options(list_options):
-	teachers_opt  = []
-	for comment in data2.itertuples():
-		if comment.Course in list_options:
-			teachers_opt.append(comment.Teacher)
-	data4 = pd.DataFrame(teachers_opt, columns=['Teacher'])
-	return data4['Teacher'].unique()
+			#neutral LSA
+			st.title('Neutral Topics')
+			neutral_model=create_gensim_lsa_model(clean_neutral,number_of_topics,words)
+			for index, topic in neutral_model.show_topics(num_topics=number_of_topics, num_words=words, formatted = False):
+					st.text('Topic: {} \nWords: {}'.format(index+1, '|'.join([w[0] for w in topic])))
 
-def get_selected_teacher(is_restricted, cd_options):
-	with st.container():
-		if is_restricted:
-			teacher_dropdown = st.selectbox('Teachers', get_teacher_options(cd_options))
+			create_graph_options()
 		else:
-			teacher_dropdown = st.selectbox('Teachers', data2['Teacher'].unique())
-	return teacher_dropdown
+			st.error("Selected course is not available to the selected teacher")
+			create_graph_options()
 
-def get_course_options(list_options):
-	courses_opt  = []
-	for comment in data2.itertuples():
-		if comment.Teacher in list_options:
-			courses_opt.append(comment.Course)
-	data3 = pd.DataFrame(courses_opt, columns=['Course'])
-	return data3['Course'].unique()
-
-def get_selected_course(is_restricted, td_options):
-	with st.container():
-		if is_restricted:
-			courses_dropdown = st.selectbox('Courses', get_course_options(td_options))
-		else:
-			courses_dropdown = st.selectbox('Courses', data2['Course'].unique())
-	return courses_dropdown
-
-def create_graph(graph_dropdown):
-	if graph_dropdown == 'All Evaluations':
-		teacher = get_selected_teacher(False, [])
-		course = get_selected_course(False, [])
-		st.title(f"Classifications of {teacher}")
-		bar_graph_teacher(data2, teacher, course, False)
-		st.title(f"Classifications of {course}")
-		bar_graph_course(data2, course, teacher, False)
-
-	elif graph_dropdown == 'Teachers Evaluation':
-		teacher2 = get_selected_teacher(False, [])
-		course2 = get_selected_course(True, teacher2)
-		st.title(f"Classifications of {teacher2}")
-		bar_graph_teacher(data2, teacher2, course2, False)
-		st.title(f"Classifications of {course2}")
-		bar_graph_course(data2, course2, teacher2, True)
-
-	elif graph_dropdown == 'Courses Evaluation':
-		course3 = get_selected_course(False, [])
-		teacher3 = get_selected_teacher(True, course3)
-		st.title(f"Classifications of {course3}")
-		bar_graph_course(data2, course3, teacher3, False)
-		st.title(f"Classifications of {teacher3}")
-		bar_graph_teacher(data2, teacher3, course3, True)
-		
-	else:
-		print("Something happened")
-
-with graph_options:
-	graph_dropdown = st.selectbox('Select Evaluation', ['All Evaluations', 'Teachers Evaluation', 'Courses Evaluation'])
-	create_graph(graph_dropdown)
